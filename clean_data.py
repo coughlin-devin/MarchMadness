@@ -11,78 +11,37 @@ import os
 # season-total_per_game
 # per game
 
-def possessions(FGA, FG, ORB, DRB, TOV, FTA, FGA_OP, FG_OP, ORB_OP, DRB_OP, TOV_OP, FTA_OP, weight_ft=0.475, weight_reb=1.07):
-    """
-    Estimate the number of offensive possesions for a team.
-    FGA - Field Goal Attempts
-    FG - Field Goals Made
-    ORB - Offensive Rebounds
-    DRB - Deffensive Rebounds
-    TOV - Turn Overs
-    FTA - Free Throw Attempts
-    _OP - Suffix indicating opponent team's stat.
-    weight_ft - Probability of the free throw attempt being a made last free throw, or being a missed free throw with a defensive rebound.
-            This is calculated from college game data but may not be accurate/optimal.
-    weight_reb - Weight placed on percentage of missed field goals that result in offensive rebounds.
-    """
-
-    # basic formula for estimating number of possessions for a single team
-    simple = FGA - ORB + TOV + (0.475*FTA)
-
-    # parts of surgical calclation
-    team_half = FGA + weight_ft*FTA - weight_reb*(ORB / (ORB + DRB_OP)) * (FGA-FG) + TOV
-    opp_half = FGA_OP + weight_ft*FTA_OP - weight_reb*(ORB_OP / (ORB_OP + DRB)) * (FGA_OP-FG_OP) + TOV_OP
-
-    # theoretically more precise formula for estimating number of possesions from basketball-reference.com
-    surgical = 0.5 * (team_half + opp_half)
-
-    return (simple, surgical)
-
 # TODO: keep track of special school names like UCLA to correctly format them into more common form ex. brigham-boung -> BYU
 def format_school_name(school):
-    """Format school name into common team name."""
+    """Format the school name into the common team name.
+
+    Remove .html extension and replace - with spaces. Replace name with common abbreviation if relevent.
+
+    Args:
+        school: A file name in the form school-name.html containing scraped html data.
+    Returns:
+        The common team name of each school.
+    Raises:
+    """
     team = school.replace(".html", "")
     team = team.replace("-", " ")
     # team = team.title()
     return team
 
 def add_team_year(df, team, year):
+    """Add columns for team name and year to a DataFrame.
+
+     Args:
+        df: A DataFrame.
+        team: A string of a team name.
+        year: A number of the year.
+     Returns:
+        The input DataFrame with an added column containging the team name and year.
+     Raises:
+    """
     df["Team"] = team
     df["Year"] = int(year)
     return df
-
-# IDEA: weight each players height by some metric like minutes played, possessions played, games played etc
-def avg_height():
-    """Calculate average team height."""
-    pass
-
-def interior_height():
-    """Calculate average team height of Centers and Forwards."""
-    pass
-
-def exterior_height():
-    """Calculate average team height of Gaurds."""
-    pass
-
-# IDEA: weight each players height by some metric like minutes played, possessions played, games played etc
-def avg_weight():
-    """Calculate average team weight."""
-    pass
-
-def interior_weight():
-    """Calculate average team weight of Centers and Forwards."""
-    pass
-
-def exterior_weight():
-    """Calculate average team weight of Gaurds."""
-    pass
-
-def build_roster(soup, team_name, year):
-    """Turn roster table html into a DataFrame."""
-    html = soup.find("table", id="roster")
-    roster = pd.read_html(str(html), flavor="bs4")[0]
-    roster = add_team_year(roster, team_name, year)
-    return roster
 
 def get_seed(soup):
     pass
@@ -91,39 +50,112 @@ def tournament_performance(soup):
     pass
 
 def is_conference_champion(soup):
-    pass
+    """Determine if a team won their conference regular season or conference tournament.
 
-def is_conference_tournament_champion(soup):
-    pass
+     Args:
+        soup: A BeautifulSoup object containing parsed html data.
+     Returns:
+        A tuple of booleans 0 or 1 indicating if the team won their conference regular season and tournament.
+     Raises:
+    """
+    reg_season = 0
+    tourney = 0
+    bling = soup.find(id="bling").find_all("a")
+    for champ in bling:
+        if champ.text.count("Reg Season") == 1:
+            reg_season = 1
+        if champ.text.count("Tourney") == 1:
+            tourney = 1
+    return (reg_season, tourney)
 
-# TODO: seed, # of rounds progressed, conference tournament champ? conference season champ?
+def build_roster(soup, team_name, year):
+    """Convert an html table of roster info into a DataFrame.
+
+     Args:
+        soup: A BeautifulSoup object containing parsed html data.
+        team_name: A string of a team name.
+        year: A number of a year.
+     Returns:
+        A DataFrame of roster information such as class, position, height, and weight.
+     Raises:
+    """
+    html = soup.find("table", id="roster")
+    roster = pd.read_html(str(html), flavor="bs4")[0]
+    roster = add_team_year(roster, team_name, year)
+    return roster
+
+# TODO: add seed and how far into the tournament the team went
 def build_team_per_game(soup, team_name, year):
-    """Combine team and opponnet html tables into a DataFrame."""
+    """Convert an html table of team stats into a DataFrame.
+
+    Combine the two rows for team and opponent stats into one, and add rank information as new columns.
+
+     Args:
+        soup: A BeautifulSoup object containing parsed html data.
+        team_name: A string of a team name.
+        year: A number of a year.
+     Returns:
+        A DataFrame with one row of team and opponent statistics.
+     Raises:
+    """
+    # select table of team and opponent stats
     html = soup.find("table", id="season-total_per_game")
     table = pd.read_html(str(html), flavor="bs4")[0]
+
+    # seperate each row
     team = pd.DataFrame(table.iloc[0, 1:]).T
     team_rank = pd.DataFrame(table.iloc[1, 1:]).T.reset_index(drop=True)
-    team_rank.columns = [col+"R" for col in team_rank.columns]
     opponent = pd.DataFrame(table.iloc[2, 1:]).T.reset_index(drop=True)
-    opponent.columns = [col+"_OP" for col in opponent.columns]
     opponent_rank = pd.DataFrame(table.iloc[3, 1:]).T.reset_index(drop=True)
+
+    # rename columns before combining into a single row
+    team_rank.columns = [col+"R" for col in team_rank.columns]
+    opponent.columns = [col+"_OP" for col in opponent.columns]
     opponent_rank.columns = [col+"R_OP" for col in opponent_rank.columns]
+
+    # combine into a single row
     team = pd.concat([team, team_rank], axis=1)
     opponent = pd.concat([opponent, opponent_rank], axis=1)
     team_per_game = pd.concat([team, opponent], axis=1)
+
+    # add other important columns
     team_per_game = add_team_year(team_per_game, team_name, year)
+    conf_champ = is_conference_champion(soup)
+    team_per_game["CSC"] = conf_champ[0]
+    team_per_game["CTC"] = conf_champ[1]
+    # TODO: add seed
+    # TODO: add number of rounds won in tournament
     return team_per_game
 
 def build_player_per_game(soup, team_name, year):
-    """Turn player per game html table into a DataFrame."""
+    """Convert an html table of player per-game stats into a DataFrame.
+
+     Args:
+        soup: A BeautifulSoup object containing parsed html data.
+        team_name: A string of a team name.
+        year: A number of a year.
+     Returns:
+        A DataFrame of player per-game stats.
+     Raises:
+    """
     html = soup.find("table", id="per_game")
     player_per_game = pd.read_html(str(html), flavor="bs4")[0]
     player_per_game = add_team_year(player_per_game, team_name, year)
     return player_per_game
 
+# WARNING: south carolina state 1998 is missing table
 def build_per_40(soup, team_name, year):
-    # WARNING: south carolina state 1998 missing table
-    """Turn player per 40 minutes html table into a DataFrame."""
+    """Turn player an html table of player per-40 minutes stats into a DataFrame.
+
+     Args:
+        soup: A BeautifulSoup object containing parsed html data.
+        team_name: A string of a team name.
+        year: A number of a year.
+     Returns:
+        A DataFrame of player per-40 minutes stats.
+     Raises:
+        ValueError: No tables found for South Carolina State 1998.
+    """
     html = soup.find("table", id="per_min")
     if html is not None:
         per_40 = pd.read_html(str(html), flavor="bs4")[0]
@@ -134,17 +166,30 @@ def build_per_40(soup, team_name, year):
 
 # TODO: need to collect seed and how many wins from brackets
 def build_dataframes(start_year, end_year):
+    """Build complete DataFrames of each html table.
+
+    Construct DataFrames for each html table containing data from every school and year.
+
+     Args:
+        start_year: An integer of the first year to include in the data.
+        end_year: An integer of the last year to include in the data.
+     Returns:
+        Four DataFrames containing roster info, team and opponent stats, player per-game stats, and player per-40 stats.
+     Raises:
+    """
+    # store tables
     rosters = []
     team_per_games = []
     player_per_games = []
     players_per_40s = []
+
     for year in range(start_year, end_year+1):
         if year != 2020:
             for school in os.listdir("Seasons/{}".format(year)):
-                team_name = format_school_name(school)
                 with open("Seasons/{}/{}".format(year, school), "r") as f:
                     page = f.read()
                 soup = BeautifulSoup(page, "html.parser")
+                team_name = format_school_name(school)
                 roster = build_roster(soup, team_name, year)
                 team_per_game = build_team_per_game(soup, team_name, year)
                 player_per_game = build_player_per_game(soup, team_name, year)
@@ -155,10 +200,10 @@ def build_dataframes(start_year, end_year):
                 if per_40 is not None:
                     players_per_40s.append(per_40)
 
-            roster_data = pd.concat(rosters).reset_index(drop=True)
-            team_data = pd.concat(team_per_games).reset_index(drop=True)
-            player_data = pd.concat(player_per_games).reset_index(drop=True)
-            per_40_data = pd.concat(players_per_40s).reset_index(drop=True)
+    roster_data = pd.concat(rosters).reset_index(drop=True)
+    team_data = pd.concat(team_per_games).reset_index(drop=True)
+    player_data = pd.concat(player_per_games).reset_index(drop=True)
+    per_40_data = pd.concat(players_per_40s).reset_index(drop=True)
 
     roster_data.to_csv("Data/roster_table.csv", mode="w")
     team_data.to_csv("Data/team_table.csv", mode="w")
@@ -168,6 +213,10 @@ def build_dataframes(start_year, end_year):
     return (roster_data, team_data, player_data, per_40_data)
 
 # TODO: function to pull data from csv files instead now that they are made
+roster_data = pd.read_csv("roster_table.csv")
+team_data = pd.read_csv("team_table.csv")
+player_data = pd.read_csv("player_table.csv")
+per_40_data = pd.read_csv("per_40_table.csv")
 roster_data, team_data, player_data, per_40_data = build_dataframes(1997, 2024)
 
 # NOTE on RSCI (Risky) top 100 rankings: https://sites.google.com/site/rscihoops/home Link to experts: https://sites.google.com/site/rscihoops/home/the-experts
@@ -206,8 +255,67 @@ def clean_team(team_data):
     """
     pass
 
+# TODO: use "chalk" brackets (always pick higher seed) as one of the baseline tests for how well model does
+# IDEA: make a model to predict the seed of a team given their season stats and if they won conference tournament etc, use that seed prediction as a feature in the model
 # WARNING: need to clean bracket data better and extract tournament seed, # rounds advanced, if won conference tournamnent, if won conference season,
 2019-2011 68
 2010-2001 65
+roster_data.reset_index(drop=True).info()
 team_data.loc[team_data["Year"] == 1997]
 team_data.reset_index(drop=True).info()
+
+player_data.reset_index(drop=True).info()
+per_40_data.reset_index(drop=True).info()
+
+def possessions(FGA, FG, ORB, DRB, TOV, FTA, FGA_OP, FG_OP, ORB_OP, DRB_OP, TOV_OP, FTA_OP, weight_ft=0.475, weight_reb=1.07):
+    """
+    Estimate the number of offensive possesions for a team.
+    FGA - Field Goal Attempts
+    FG - Field Goals Made
+    ORB - Offensive Rebounds
+    DRB - Deffensive Rebounds
+    TOV - Turn Overs
+    FTA - Free Throw Attempts
+    _OP - Suffix indicating opponent team's stat.
+    weight_ft - Probability of the free throw attempt being a made last free throw, or being a missed free throw with a defensive rebound.
+            This is calculated from college game data but may not be accurate/optimal.
+    weight_reb - Weight placed on percentage of missed field goals that result in offensive rebounds.
+    """
+
+    # basic formula for estimating number of possessions for a single team
+    simple = FGA - ORB + TOV + (0.475*FTA)
+
+    # parts of surgical calclation
+    team_half = FGA + weight_ft*FTA - weight_reb*(ORB / (ORB + DRB_OP)) * (FGA-FG) + TOV
+    opp_half = FGA_OP + weight_ft*FTA_OP - weight_reb*(ORB_OP / (ORB_OP + DRB)) * (FGA_OP-FG_OP) + TOV_OP
+
+    # theoretically more precise formula for estimating number of possesions from basketball-reference.com
+    surgical = 0.5 * (team_half + opp_half)
+
+    return (simple, surgical)
+
+# IDEA: weight each players height by some metric like minutes played, possessions played, games played etc
+def avg_height():
+    """Calculate average team height."""
+    pass
+
+def interior_height():
+    """Calculate average team height of Centers and Forwards."""
+    pass
+
+def exterior_height():
+    """Calculate average team height of Gaurds."""
+    pass
+
+# IDEA: weight each players height by some metric like minutes played, possessions played, games played etc
+def avg_weight():
+    """Calculate average team weight."""
+    pass
+
+def interior_weight():
+    """Calculate average team weight of Centers and Forwards."""
+    pass
+
+def exterior_weight():
+    """Calculate average team weight of Gaurds."""
+    pass
