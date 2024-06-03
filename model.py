@@ -8,12 +8,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-# TODO: incorporate other data files
-# import data
-kenpom = pd.read_csv("Data_1.0/KenPom Barttorvik.csv")
-public = pd.read_csv("Public Picks.csv")
-ap = pd.read_csv("Preseason Votes.csv")
-shooting = pd.read_csv("Shooting Splits.csv")
+# IDEA: weight training by single score and double score, ex. x/64 and /192
+# IDEA: play with using target values rounds as 0-6, 1-7, and 64,32,16,8,4,2,1
+# IDEA: create a different model for the first round, second round, etc.
+# IDEA: try a model to predict the probability of a single game (logistic regression)
 
 #%% markdown
 # ### Preprocessing
@@ -24,9 +22,6 @@ def set_random_seed(seed):
     """Set random seed for all potential libraries"""
     torch.manual_seed(seed)
     np.random.seed(seed)
-
-data.dtypes
-data.describe()
 
 def clean(data, year, first_four_out):
     """Clean data to remove round of 68 losers and seperate current year tournament teams to predict."""
@@ -75,47 +70,19 @@ def normalize(data):
 # ### Feature Selection
 
 #%% codecell
-# correlation matrix
-data, cy = clean(data, 2024, first_four_out)
-
-cm = data.loc[data['YEAR'] != 2024].corr()
-cm.style.background_gradient(cmap='coolwarm').set_precision(2)
-
-# # group 2024 teams by seed number
-gb_seed24 = data24.groupby('SEED').mean()
-gb_seed24.style.background_gradient(cmap='coolwarm').set_precision(2)
+# # correlation matrix
+# data, cy = clean(data, 2024, first_four_out)
 #
-# # group teams by round made in tournament
-gb_round = data.drop('YEAR', axis=1).groupby('ROUND').mean()
-gb_round.style.background_gradient(cmap='coolwarm').set_precision(2)
+# cm = data.loc[data['YEAR'] != 2024].corr()
+# cm.style.background_gradient(cmap='coolwarm').set_precision(2)
 
-
-# reduce colinearity among features
-# combine average and effective height metrics
-data.loc[:, 'HGT'] = data['AVG HGT'] + data['EFF HGT']
-current_year.loc[:, 'HGT'] = data24['AVG HGT'] + data24['EFF HGT']
-features.remove('AVG HGT')
-features.remove('EFF HGT')
-features.append('HGT')
-
-# use PCA components
-pca = PCA(n_components=10, random_state=random_state)
-# create principal components
-pca_data = normalize(data[features].drop('ROUND', axis=1))
-components = pca.fit_transform(pca_data)
-
-# convert to dataframe
-component_names = [f"PC{i+1}" for i in range(10)]
-components = pd.DataFrame(components[:,:10], columns=component_names)
-data = pd.concat((data,components), axis=1)
-components_24 = pca.transform(normalize(data24.drop(['TEAM', 'AVG HGT', 'EFF HGT'], axis=1)))
-components_24 = pd.DataFrame(components_24[:,:10], columns=component_names)
-components_24.index = data24.index
-data24 = pd.concat((data24,components_24), axis=1)
-
-features.extend(component_names)
-# select fewer more highly correlated features to ROUND
-hcf = ['SEED', 'WIN%', 'EFG%', 'EFG%D', 'FTR', 'FTRD', 'TOV%', 'OREB%', '2PT%', '2PT%D', '3PT%', '3PT%D', 'BLK%', 'BLKED%', 'HGT', 'EXP', 'PPPO', 'PPPD', 'PC1', 'PC3', 'PC5']
+# # # group 2024 teams by seed number
+# gb_seed24 = data24.groupby('SEED').mean()
+# gb_seed24.style.background_gradient(cmap='coolwarm').set_precision(2)
+# #
+# # # group teams by round made in tournament
+# gb_round = data.drop('YEAR', axis=1).groupby('ROUND').mean()
+# gb_round.style.background_gradient(cmap='coolwarm').set_precision(2)
 
 #%% markdown
 # ### Neural Network
@@ -145,7 +112,7 @@ class Net(nn.Module):
 # ### Cross Validation
 
 #%% codecell
-def train_loop(X, y):
+def train_loop(X, y, model, loss_fn, optimizer):
     model.train()
     logits = model(X)
     loss = torch.sqrt(loss_fn(logits, y)) # NOTE this is RMSE not MSE
@@ -156,43 +123,37 @@ def train_loop(X, y):
     optimizer.step()
     return loss
 
-def test_loop(X, y):
+def test_loop(X, y, model, loss_fn):
     model.eval()
     with torch.no_grad():
         predictions = model(X)
         loss = torch.sqrt(loss_fn(predictions, y))
     return (predictions, loss)
 
-def fold():
+def fold(data, batch_size, f):
     """Split training data into training and validation folds."""
+    X_train = data[hcf].drop("ROUND", axis=1)
+    y_train = data['ROUND']
+
     # training fold
-    X = normalize(X_train.drop(X_train.index[fold:fold+batch_size], axis=0))
+    X = normalize(X_train.drop(X_train.index[f:f+batch_size], axis=0))
     X = torch.tensor(X, dtype=torch.float32, requires_grad=True)
-    y = y_train.drop(X_train.index[fold:fold+batch_size], axis=0)
+    y = y_train.drop(X_train.index[f:f+batch_size], axis=0)
     y = torch.tensor(y.values, dtype=torch.float32, requires_grad=True)
     y = torch.unsqueeze(y,1)
 
     # validation fold
-    X_validation = normalize(X_train.iloc[fold:fold+batch_size])
+    X_validation = normalize(X_train.iloc[f:f+batch_size])
     X_validation = torch.tensor(X_validation, dtype=torch.float32, requires_grad=False)
-    y_validation = y_train.iloc[fold:fold+batch_size]
+    y_validation = y_train.iloc[f:f+batch_size]
     y_validation = torch.tensor(y_validation.values, dtype=torch.float32, requires_grad=False)
     y_validation = torch.unsqueeze(y_validation,1)
 
-    return (X_validation, y_validation, X, y)
+    return (X, y, X_validation, y_validation)
 
 # TODO: ensemble model to reduce variance, look into rotating test year or doing cross validation in a smarter way
 def cross_validation():
-train_error = []
-validation_error = []
-for fold in range(K):
-    X_validation, y_validation, X, y = fold()
-
-    for ep in range(epochs):
-        train_rmse = train_loop(X, y)
-        predictions, validation_rmse = test_loop(X_validation, y_validation)
-        train_error.append(train_rmse.item())
-        validation_error.append(validation_rmse.item())
+    pass
 
 def test(X_test, y_test):
     """Evaluate model on test set data."""
@@ -216,27 +177,58 @@ def plot_loss(train_errors, validation_erros, test_errors):
 
 # TODO save best model based on test data before prediction data
 
-def predict_24():
-    """Run model on 2024 data to predict March Madness wins for each team."""
-    X24 = data24.drop('TEAM', axis=1)[hcf]
-    X24 = normalize(X24)
-    X24 = torch.tensor(X24, dtype=torch.float32, requires_grad=False)
+def predict(model, data, hcf):
+    """Predict the number of March Madness wins for each team."""
+    X = data.drop('TEAM', axis=1)[hcf]
+    X = normalize(X)
+    X = torch.tensor(X, dtype=torch.float32, requires_grad=False)
     with torch.no_grad():
         model.eval()
-        nn_predictions = model(X24)
+        nn_predictions = model(X)
     nn_predictions = [p.item() for p in nn_predictions]
-    P24 = data24
-    P24.loc[:,'PRED'] = nn_predictions
-    P24 = P24.sort_values(by='PRED', ascending=False)
-    return P24
-
-P24 = predict_24()
+    prediction = data
+    prediction.loc[:,'PRED'] = nn_predictions
+    prediction = prediction.sort_values(by='PRED', ascending=False)
+    return prediction
 
 # WARNING: broken
 def main():
     set_random_seed(2024)
+    # import data
+    kenpom = pd.read_csv("Data_1.0/KenPom Barttorvik.csv")
+    # public = pd.read_csv("Data_1.0/Public Picks.csv")
+    # ap = pd.read_csv("Data_1.0/Preseason Votes.csv")
+    # shooting = pd.read_csv("Data_1.0/Shooting Splits.csv")
+
     first_four_out = ["Howard", "Virginia", "Boise St.", "Montana St."]
-    data, current_year = clean(2024, first_four_out)
+    data, current_year = clean(kenpom, 2024, first_four_out)
+
+    # reduce colinearity among features
+    # combine average and effective height metrics
+    data.loc[:, 'HGT'] = data['AVG HGT'] + data['EFF HGT']
+    current_year.loc[:, 'HGT'] = current_year['AVG HGT'] + current_year['EFF HGT']
+
+    # use PCA components
+    pca = PCA(n_components=10, random_state=2024)
+    features = ['SEED', 'WIN%', 'EFG%', 'EFG%D', 'FTR', 'FTRD', 'TOV%', 'OREB%', '2PT%', '2PT%D', '3PT%', '3PT%D', 'BLK%', 'BLKED%', 'HGT', 'EXP', 'PPPO', 'PPPD']
+    # create principal components
+    pca_data = normalize(data[features])
+    components = pca.fit_transform(pca_data)
+
+    # convert to dataframe
+    component_names = [f"PC{i+1}" for i in range(10)]
+    components = pd.DataFrame(components[:,:10], columns=component_names)
+    data.reset_index(drop=True, inplace=True)
+    data = pd.concat((data,components), axis=1)
+    components_current_year = pca.transform(normalize(current_year.drop(['TEAM', 'AVG HGT', 'EFF HGT'], axis=1)[features]))
+    components_current_year = pd.DataFrame(components_current_year[:,:10], columns=component_names)
+    components_current_year.index = current_year.index
+    current_year = pd.concat((current_year,components_current_year), axis=1)
+
+    features.extend(component_names)
+    # select fewer more highly correlated features to ROUND
+    hcf = ['ROUND', 'SEED', 'WIN%', 'EFG%', 'EFG%D', 'FTR', 'FTRD', 'TOV%', 'OREB%', '2PT%', '2PT%D', '3PT%', '3PT%D', 'BLK%', 'BLKED%', 'HGT', 'EXP', 'PPPO', 'PPPD', 'PC1', 'PC3', 'PC5']
+
     K = len(data.YEAR.unique()) - 1
     batch_size = 64
     learning_rate = 0.001
@@ -246,6 +238,22 @@ def main():
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+    train_error = []
+    validation_error = []
+    for f in range(K):
+        X, y, X_validation, y_validation = fold(data[hcf], batch_size, f*batch_size)
+
+        for ep in range(epochs):
+            train_rmse = train_loop(X, y, model, loss_fn, optimizer)
+            predictions, validation_rmse = test_loop(X_validation, y_validation, model, loss_fn)
+            train_error.append(train_rmse.item())
+            validation_error.append(validation_rmse.item())
+
+    pred = predict(model, current_year, ['SEED', 'WIN%', 'EFG%', 'EFG%D', 'FTR', 'FTRD', 'TOV%', 'OREB%', '2PT%', '2PT%D', '3PT%', '3PT%D', 'BLK%', 'BLKED%', 'HGT', 'EXP', 'PPPO', 'PPPD', 'PC1', 'PC3', 'PC5'])
+    return pred
+
+pred = main()
+pred[['TEAM','PRED']]
 # P24.loc[(P24['TEAM'] == "Creighton") | (P24['TEAM'] == "Saint Mary's"), ['TEAM','PRED']]
 # P24.loc[(P24['SEED'] == 5) | (P24['SEED'] == 12), ['TEAM', 'PRED']]
 #
