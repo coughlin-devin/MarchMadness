@@ -4,8 +4,6 @@ from bs4 import BeautifulSoup
 import re
 import os
 
-# TODO: docstrings
-
 def add_keys(df, school, year):
     """Add keys school and year to a DataFrame.
 
@@ -256,16 +254,23 @@ def build_per_game_player(soup, school, year):
 
 # WARNING: south carolina state 1998 is missing table
 def build_per_40(soup, school, year):
-    """Turn player an html table of player per-40 minutes stats into a DataFrame.
+    """Create a DataFrame containing player per 40 minute statistics.
 
-     Args:
-        soup: A BeautifulSoup object containing parsed html data.
-        school: A string of a school name.
-        year: A number of a year.
-     Returns:
-        A DataFrame of player per-40 minutes stats.
-     Raises:
-        ValueError: No tables found for South Carolina State 1998.
+    Converts an HTML table object into a DataFrame. The DataFrame will contain stats like player shooting percentages, assists, steals, blocks, rebounds and points scored per 40 minutes.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of basic per 40 minutes player statistics.
     """
     per_min = soup.find('table', id='per_min')
     if per_min is not None:
@@ -276,18 +281,72 @@ def build_per_40(soup, school, year):
         return None
 
 def build_schedule(soup, school, year):
+    """Create a DataFrame containing team schedule information.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain information like win streaks and simple rating system scores.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of team schedule information.
+    """
     schedule = soup.find('table', id='schedule')
     schedule = pd.read_html(str(schedule), flavor='bs4')[0]
     schedule = add_keys(schedule, school, year)
     return schedule
 
 def build_ap_poll(soup, school, year):
+    """Create a DataFrame containing AP poll ranings.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain AP rankings for the team.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of AP poll rankings.
+    """
     ap_poll = soup.find('table', id='polls')
     ap_poll = pd.read_html(str(ap_poll), flavor='bs4')[0]
     ap_poll = add_keys(ap_poll, school, year)
     return ap_poll
 
 def build_basic_stats(year):
+    """Create a DataFrame containing basic team statistics.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain basic teams stats like shooting% and rebounding for all Division 1 teams.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of basic team statistics.
+    """
     with open(r"School Stats/Basic/basic_{}.html".format(year), 'r', encoding='utf-8') as f:
         page = f.read()
     soup = BeautifulSoup(page, 'html.parser')
@@ -297,6 +356,24 @@ def build_basic_stats(year):
     return basic_school_stats
 
 def build_advanced_stats(year):
+    """Create a DataFrame containing advanced team statistics.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain advanced teams stats like shooting efficiency for all Division 1 teams.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of advanced team statistics.
+    """
     with open(r"School Stats/Advanced/advanced_{}.html".format(year), 'r', encoding='utf-8') as f:
         page = f.read()
     soup = BeautifulSoup(page, 'html.parser')
@@ -306,16 +383,19 @@ def build_advanced_stats(year):
     return advanced_school_stats
 
 def build_DataFrames(start_year, end_year):
-    """Build complete DataFrames of each html table.
+    """Build DataFrames from HTML data.
 
-    Construct DataFrames for each html table containing data from every school and year.
+    Parameters
+    ----------
+    start_year : int
+        First year of data to use.
+    end_year : int
+        Last year of data to use.
 
-     Args:
-        start_year: An integer of the first year to include in the data.
-        end_year: An integer of the last year to include in the data.
-     Returns:
-        Four DataFrames containing roster info, team and opponent stats, player per-game stats, and player per-40 stats.
-     Raises:
+    Returns
+    -------
+    tuple of 8 DataFrames
+        Returns a tuple of 8 DataFrames and writes to file.
     """
     # create folder for the data
     if not os.path.exists(r"Data"):
