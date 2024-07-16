@@ -128,9 +128,9 @@ def is_conference_champion(soup):
     """
     reg_season = 0
     tourney = 0
-    bling = soup.find(id="bling")
+    bling = soup.find(id='bling')
     if bling is not None:
-        titles = bling.find_all("a")
+        titles = bling.find_all('a')
         for title in titles:
             if 'Reg Season' in title.get_text():
                 reg_season = 1
@@ -157,7 +157,7 @@ def build_roster(soup, school, year):
     DataFrame
         Returns a DataFrame of roster information.
     """
-    roster = soup.find('table', id="roster")
+    roster = soup.find('table', id='roster')
     roster = pd.read_html(str(roster), flavor='bs4')[0]
     roster = add_keys(roster, school, year)
     return roster
@@ -183,7 +183,7 @@ def build_per_game_team_opp(soup, school, year):
         Returns a DataFrame of basic team and opponent stats and rankings.
     """
     # select table of team and opponent stats
-    season_total_per_game = soup.find('table', id="season-total_per_game")
+    season_total_per_game = soup.find('table', id='season-total_per_game')
     season_total_per_game = pd.read_html(str(season_total_per_game), flavor='bs4')[0]
 
     # seperate each row
@@ -193,9 +193,9 @@ def build_per_game_team_opp(soup, school, year):
     opponent_rank = pd.DataFrame(season_total_per_game.iloc[3, 1:]).T.reset_index(drop=True)
 
     # rename columns before combining into a single row
-    team_rank.columns = [col+'r' for col in team_rank.columns]
-    opponent.columns = [col+"_OP" for col in opponent.columns]
-    opponent_rank.columns = [col+"R_OP" for col in opponent_rank.columns]
+    team_rank.columns = [col+'R' for col in team_rank.columns]
+    opponent.columns = [col+'_OP' for col in opponent.columns]
+    opponent_rank.columns = [col+'R_OP' for col in opponent_rank.columns]
 
     # combine into a single row
     team = pd.concat([team, team_rank], axis=1)
@@ -420,7 +420,6 @@ def build_DataFrames(start_year, end_year):
             basic_school_stats.append(basic_stats)
             advanced_school_stats.append(advanced_stats)
 
-            # ncaa_64 = get_64(year)
             for file in os.listdir(r"Roster & Stats/{}".format(year)):
                 school, ext = os.path.splitext(file)
 
@@ -458,14 +457,14 @@ def build_DataFrames(start_year, end_year):
     ap_poll_df = pd.concat(ap_polls).reset_index(drop=True)
 
     # save to csv files
-    basic_stats_df.to_csv(r"Data/basic_stats_table.csv", mode='w')
-    advanced_stats_df.to_csv(r"Data/advanced_stats_table.csv", mode='w')
-    roster_df.to_csv(r"Data/roster_table.csv", mode='w')
-    team_opp_df.to_csv(r"Data/team_opp_table.csv", mode='w')
-    player_df.to_csv(r"Data/player_table.csv", mode='w')
-    per_40_df.to_csv(r"Data/per_40_table.csv", mode='w')
-    schedule_df.to_csv(r"Data/schedule_table.csv", mode='w')
-    ap_poll_df.to_csv(r"Data/ap_poll_table.csv", mode='w')
+    basic_stats_df.to_csv(r"Data/Raw/basic_stats_table.csv", mode='w', index=False)
+    advanced_stats_df.to_csv(r"Data/Raw/advanced_stats_table.csv", mode='w', index=False)
+    roster_df.to_csv(r"Data/Raw/roster_table.csv", mode='w', index=False)
+    team_opp_df.to_csv(r"Data/Raw/team_opp_table.csv", mode='w', index=False)
+    player_df.to_csv(r"Data/Raw/player_table.csv", mode='w', index=False)
+    per_40_df.to_csv(r"Data/Raw/per_40_table.csv", mode='w', index=False)
+    schedule_df.to_csv(r"Data/Raw/schedule_table.csv", mode='w', index=False)
+    ap_poll_df.to_csv(r"Data/Raw/ap_poll_table.csv", mode='w', index=False)
 
     return (basic_stats_df, advanced_stats_df, roster_df, team_opp_df, player_df, per_40_df, schedule_df, ap_poll_df)
 
