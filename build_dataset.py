@@ -138,6 +138,27 @@ def is_conference_champion(soup):
                 tourney = 1
     return (reg_season, tourney)
 
+# NOTE: find html tag by attribute using dictionary {attr : name}
+def get_srs(soup):
+    """Get the Simple Rating System (SRS) rating of a school.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+
+    Returns
+    -------
+    float
+        Returns the SRS number.
+    """
+    summary = soup.find(attrs={'data-template':'Partials/Teams/Summary'})
+    lines = summary.find_all('p')
+    for line in lines:
+        if 'SRS' in line.get_text():
+            srs = float(re.search("[0-9]+\.[0-9]+", line.get_text()).group(0))
+    return srs
+
 def build_roster(soup, school, year):
     """Create a DataFrame containing roster information.
 
@@ -223,8 +244,12 @@ def build_per_game_team_opp(soup, school, year):
     per_game_team_opp['CSC'] = season_champ
     per_game_team_opp['CTC'] = conf_champ
 
-    win_streak = get_win_streak(stew)
-    per_game_team_opp['WS'] = win_streak
+    srs = get_srs(soup)
+    per_game_team_opp['SRS'] = srs
+
+    # BUG: includes NCAA games in data
+    # win_streak = get_win_streak(stew)
+    # per_game_team_opp['WS'] = win_streak
 
     return per_game_team_opp
 
@@ -325,6 +350,9 @@ def build_ap_poll(soup, school, year):
     """
     ap_poll = soup.find('table', id='polls')
     ap_poll = pd.read_html(str(ap_poll), flavor='bs4')[0]
+    dates = ap_poll.drop(['School', 'Pre', 'Final'], axis=1)
+    dates.columns = [x + '/' + str(year) for x in dates.columns]
+    ap_poll = pd.concat([ap_poll[['School', 'Pre', 'Final']], dates], axis=1)
     ap_poll = add_keys(ap_poll, school, year)
     return ap_poll
 
@@ -414,7 +442,7 @@ def build_DataFrames(start_year, end_year):
     for year in range(start_year, end_year+1):
         if year != 2020:
 
-            # build tables from School Stats page
+            build tables from School Stats page
             basic_stats = build_basic_stats(year)
             advanced_stats = build_advanced_stats(year)
             basic_school_stats.append(basic_stats)
