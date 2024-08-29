@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import time
 import os
 
+# TODO: scrape per 100 possession data and only create it for teams without
+
 def get_ncaa_schools(year):
     """Create a list of each school in the NCAA tournament in a given year.
 
