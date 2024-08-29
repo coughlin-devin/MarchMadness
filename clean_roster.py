@@ -5,8 +5,7 @@ import pandas as pd
 def get_data():
     # pull csv table
     roster_df = pd.read_csv(r"Data/Raw/roster_table.csv")
-    roster_df
-    df = roster_df[['School', 'Year', 'Player', 'Class', 'Pos', 'Height', 'Weight', 'Summary', 'RSCI Top 100']].copy()
+    df = roster_df[['School', 'Year', 'Player', 'Class', 'Pos', 'Height', 'Weight', 'RSCI Top 100']].copy()
 
     # remove players who aren't in the player per game or player per 40 minutes tables because they are likely redshirts and did not play
     player_df = pd.read_csv(r"Data/Raw/player_table.csv")
@@ -138,8 +137,35 @@ def clean(df, start_year, end_year):
     df = ordinal_encoding(df)
     df = fill_height_weight(df, 'Height', start_year, end_year)
     df = fill_height_weight(df, 'Weight', start_year, end_year)
-
     return df
 
+# TODO: create features
+def avg_height():
+    """Calculate average team height."""
+    pass
+
+def interior_height():
+    """Calculate average team height of Centers and Forwards."""
+    pass
+
+def exterior_height():
+    """Calculate average team height of Gaurds."""
+    pass
+
+# IDEA: weight each players height by some metric like minutes played, possessions played, games played etc
+def avg_weight():
+    """Calculate average team weight."""
+    pass
+
+def interior_weight():
+    """Calculate average team weight of Centers and Forwards."""
+    pass
+
+def exterior_weight():
+    """Calculate average team weight of Gaurds."""
+    pass
+
+
+
 df = clean(df, 1997, 2024)
-df.to_csv(r"Data/Clean/clean_roster.csv", index=False)
+df.to_csv(r"Data/Clean/clean_roster.csv", mode='w', index=False)
