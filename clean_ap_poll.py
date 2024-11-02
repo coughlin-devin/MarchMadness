@@ -3,18 +3,19 @@ import numpy as np
 
 ap = pd.read_csv(r"Data/Raw/ap_poll_table.csv")
 
-# reorder columns
+# reorder columns so Year is first column
 cols = ap.columns.tolist()
 cols.remove('Year')
 cols.insert(3, 'Year')
 
+# convert ap rankings to numeric type
 df = ap[cols]
 df.replace('-', np.nan, inplace=True)
 df.loc[:, df.columns != 'School'] = df.loc[:, df.columns != 'School'].apply(pd.to_numeric, axis=1)
 df.loc[:, (df.columns != 'School') & (df.columns != 'Year')] = 26 - df.loc[:, (df.columns != 'School') & (df.columns != 'Year')]
 df.fillna(value=0, inplace=True)
 
-# create columns for creating features
+# create columns for new features
 df['AP_Mean'] = 0
 df['AP_5GMean'] = 0
 df['AP_Min'] = 0
@@ -22,6 +23,24 @@ df['AP_Max'] = 0
 df['AP_Diff'] = df.Final - df.Pre
 
 def add_features(df, start_year, end_year):
+    """Add features to the DataFrame.
+
+    Calculate and add new features related to AP poll to the DataFrame.
+
+    Parameters
+    ----------
+    df : panda DataFrame
+        DataFrame of AP poll data.
+    start_year : int
+        First year of data to use in computation.
+    end_year : int
+        Last year of data to use in computation.
+
+    Returns
+    -------
+    pandas DataFrame
+        Returns DataFrame with new AP poll features.
+    """
     for year in range(start_year, end_year+1):
         this_year = df.loc[df['Year'] == year]
         cols = [x for x in df.columns if str(year) in x]
@@ -33,6 +52,8 @@ def add_features(df, start_year, end_year):
     return df
 
 df = add_features(df, 1997, 2024)
+
+# get slice
 df = df[['School', 'Year', 'Pre', 'Final', 'AP_Mean', 'AP_5GMean', 'AP_Min', 'AP_Max', 'AP_Diff']]
 
 # round df

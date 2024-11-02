@@ -4,6 +4,20 @@ import pandas as pd
 schedule = pd.read_csv(r"Data/Raw/schedule_table.csv", low_memory=False)
 
 def prepare_frame(frame):
+    """Clean the DataFrame so that is ready to work with.
+
+    Rename unnamed columns, create a workable DataFrame, remove repeated header rows, remove NCAA games from schedule to keep data integrity when and where possible.
+
+    Parameters
+    ----------
+    frame : pandas DataFrame
+        Raw DataFrame needing to be prepared to work with.
+
+    Returns
+    -------
+    DataFrame
+        Returns cleaned and workable DataFrame.
+    """
     # rename unnamed and duplicated columns
     frame.rename(columns={"Unnamed: 3": "Venue", "Unnamed: 4": "Venue2"}, inplace=True)
     frame.rename(columns={"Unnamed: 7": "Result", "Unnamed: 8": "Result2"}, inplace=True)
@@ -24,8 +38,21 @@ def prepare_frame(frame):
 
     return df
 
-# clean Venue column so that home games are 1 and non-home games are 0 and combine split venue columns
 def venue(df):
+    """Create dummy variables for home, away and neutral site venues.
+
+    Encodes H, A, and N game sites to dummy variables.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to add dummy variables to.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with added dummy variables.
+    """
     venue = df.Venue.fillna('H') + df.Venue2.fillna('H')
     map_venue = {
         'HH':'H',
@@ -39,28 +66,81 @@ def venue(df):
     df.drop(['Venue', 'Venue2'], axis=1, inplace=True)
     return df
 
-# clean Result column so that Wins are 1, Losses are 0, and combine split win columns
 def result(df):
+    """Convert result column to numeric type.
+
+    Encode wins as 1, and losses as 0.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to encode game results to.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with encoded game results.
+    """
     results = df.Result.fillna("L") + df.Result2.fillna("L")
     df.Result = [1 if 'W' in x else 0 for x in results]
     df.drop(['Result2'], axis=1, inplace=True)
     return df
 
-# clean OT column to remove W and L labels
 def overtime(df):
+    """Set the number of overtime games to numeric type.
+
+    Encode overtime games as numeric type.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to encode overtime games to.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with encoded overtime game counts.
+    """
     overtime = df.loc[~df['OT'].isna()]
     ot = [1 if x == 'OT' else int(x[0]) for x in overtime.OT]
     df.loc[~df['OT'].isna(), 'OT'] = ot
     df.loc[df['OT'].isna(), 'OT'] = df.loc[df['OT'].isna(), 'OT'].fillna(value=0)
     return df
 
-# set streak to integer type where win streak is positive and losing streak is negative
 def streaks(df):
+    """Set streak to integer type.
+
+    Encode winning streaks as positive integer values and losing streaks as negative integer values.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to encode streaks to.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with streaks encoded to integer representation.
+    """
     df.loc[df['Streak'].str.contains('W'), 'Streak'] = df.loc[df['Streak'].str.contains('W'), 'Streak'].str.replace('W ', '')
     df.loc[df['Streak'].str.contains('L'), 'Streak'] =  df.loc[df['Streak'].str.contains('L'), 'Streak'].str.replace('L ', '-')
     return df
 
 def set_types(df):
+    """Set data types.
+
+    Set each column to the correct data type, either integer or float. Using default int64 and float64.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to change dtypes in.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with corrected dtypes.
+    """
     # set numeric integer columns to int64 type
     df.loc[:, ['Tm', 'Opp', 'OT', 'G', 'W', 'L', 'Streak', 'A', 'H', 'N']] = df.loc[:, ['Tm', 'Opp', 'OT', 'G', 'W', 'L', 'Streak', 'A', 'H', 'N']].astype('int64')
 
@@ -70,6 +150,20 @@ def set_types(df):
     return df
 
 def create_features(df):
+    """Create schedule features.
+
+    Create features from schedule data for exploration and use in the model.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame to add features to.
+
+    Returns
+    -------
+    DataFrame
+        Returns input DataFrame with schedule features added.
+    """
     # create empty DataFrame for features
     features = pd.DataFrame()
 
@@ -100,8 +194,25 @@ def create_features(df):
 
     return features
 
-# function to create features split by home, away, or nuetral site games
 def features_by_venue(df, features, venue):
+    """Create fetures split by which venue the game is played at.
+
+    Create features split by home games, away games, and neutral site games.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame containing schedule data to make features from.
+    features : pandas DataFrame
+        DataFrame to add features to.
+    venue : char
+        Character indicating the game site. A = Away, H = Home, N = Neutral.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with features.
+    """
     means = df.loc[df[venue] == 1].groupby(['Year', 'School']).mean()
     meds = df.loc[df[venue] == 1].groupby(['Year', 'School']).median()
     games = df.loc[df[venue] == 1].groupby(['Year', 'School']).sum()
@@ -131,6 +242,22 @@ def features_by_venue(df, features, venue):
     return features
 
 def features_not_home(df, features):
+    """Create features of Home vs Not Home games.
+
+    Split features by played at home, and not played at Home. Essentially combining away and neutral site games into one category.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame containing the base data.
+    features : DataFrame
+        DataFrame to build the features into.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame with the features.
+    """
     # create features for combined non-home games
     means = df.loc[df['H'] != 1].groupby(['Year', 'School']).mean().reset_index()
     meds = df.loc[df['H'] != 1].groupby(['Year', 'School']).median().reset_index()

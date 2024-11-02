@@ -1,8 +1,6 @@
 import pandas as pd
 from imputation import knn_imputer, position_mean_imputer
 
-# TODO: create multiple DataFrames for each method of handling missing data. KNNImputer, Random Forest imputer, Position Averaging, Discard Players with less than X number of minutes...
-
 def get_data(per_game=True):
     roster = pd.read_csv(r"Data/Clean/clean_roster.csv")
     team_opp = pd.read_csv(r"Data/Raw/team_opp_table.csv")
@@ -79,7 +77,6 @@ def drop_bench(df, percent_minutes=0.05):
     df = df.drop(bench.index).reset_index()
     return df
 
-# NOTE: metric to measure how much the starting 5 players play
 def cohesion(minutes, playing_time=40, group=5):
     """Calculate a metric describing how much the n players who play the most play together.
 
@@ -105,6 +102,30 @@ def cohesion(minutes, playing_time=40, group=5):
     return core_squad.mean() / playing_time
 
 def add_mean_features_by_filter(group, features, filter_column, columns, filter_number, filter_name):
+    """Helper function to add mean features to a DataFrame.
+
+    Format and merge mean features to a DataFrame.
+
+    Parameters
+    ----------
+    group : pandas DataFrame
+        Description of arg1.
+    features : pandas DataFrame
+        DataFrame to add the features to.
+    filter_column : String
+        Column to filter group by.
+    columns : list of Strings
+        List of columns to build features from.
+    filter_number : int
+        Integer indicating which value to filter the filter column. Either 1-4 for class or 1-3 for position.
+    filter_name : String
+        Name of value corresponding to feature number. Either class name ie. Freshman or position name ie. Center.
+
+    Returns
+    -------
+    DataFrame
+        Returns features DataFrame with added mean features.
+    """
     # drop non-feature columns
     group = group.loc[:, columns]
     # create dataframe of players included in the filter
@@ -115,6 +136,30 @@ def add_mean_features_by_filter(group, features, filter_column, columns, filter_
     return features
 
 def add_sum_features_by_filter(group, features, filter_column, columns, filter_number, filter_name):
+    """Helper function to add sum features to a DataFrame.
+
+    Format and merge sum features to a DataFrame.
+
+    Parameters
+    ----------
+    group : pandas DataFrame
+        Description of arg1.
+    features : pandas DataFrame
+        DataFrame to add the features to.
+    filter_column : String
+        Column to filter group by.
+    columns : list of Strings
+        List of columns to build features from.
+    filter_number : int
+        Integer indicating which value to filter the filter column. Either 1-4 for class or 1-3 for position.
+    filter_name : String
+        Name of value corresponding to feature number. Either class name ie. Freshman or position name ie. Center.
+
+    Returns
+    -------
+    DataFrame
+        Returns features DataFrame with added sum features.
+    """
     # drop non-feature columns
     group = group.loc[:, columns]
     # create dataframe of players included in the filter
@@ -127,6 +172,26 @@ def add_sum_features_by_filter(group, features, filter_column, columns, filter_n
     return features
 
 def add_minute_weighted_features(df, features, mwc, pmwc):
+    """Add features weighted by minutes played by the players.
+
+    Multiply features by the number of minutes the player played on average per game and as part of the total player minutes of the team. A teams player minutes are the possible minutes a player can play per game (40 without overtime) multiplied by the number of players on the court (5 players per team).
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame containing the feature data.
+    features : pandas DataFrame
+        DataFrame to add the features to.
+    mwc : list of Strings
+        Minute weighted feature columns for features weighted by minutes per game.
+    pmwc : list of String
+        Player minute weighted feature columns for features weighted by total team minutes per game.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with added features.
+    """
     columns_mwc = []
     columns_pmwc = []
     # create a column for player-minute weighted stats
@@ -148,6 +213,20 @@ def add_minute_weighted_features(df, features, mwc, pmwc):
     return features
 
 def create_features(df):
+    """Create all the player per game features.
+
+    This function calls all the feature cretion helper functions and outputs the final feature Dataframe.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame with the data to create features from.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of player per game features.
+    """
     # create features dataframe
     features = pd.DataFrame()
 
@@ -205,6 +284,22 @@ def create_features(df):
     return features
 
 def clean_player_features(per_game=True, min_minutes=0):
+    """Main logic to fetch data, clean it, and create features.
+
+    Handles the main logic of the file including fetching the data, cleaning it through calls to KNNImputer, rounding features to correct sigfigs, etc.
+
+    Parameters
+    ----------
+    per_game : bool
+        Boolean indicating whether to fetch per_game data or per_40 minute data.
+    min_minutes : float
+        Float between[0-1] indicating the minimum percentage of a teams season minutes a player needs to have played to be included in the data for building features from.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of features built from player stats.
+    """
 
     df = get_data(per_game)
 
