@@ -3,21 +3,22 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import os
+import json
 
-# TODO: scrape per 100 possession data and only create it for teams without
-
-def get_ncaa_schools(year):
+def get_ncaa_schools(map_names, year):
     """Create a list of each school in the NCAA tournament in a given year.
 
     Parameters
     ----------
+    map_names : dictionary of {string : string}
+        Dictionary mapping alternate school name to common school name.
     year : int
         Year of tournament.
 
     Returns
     -------
-    list
-        Returns a list of <a> html tags with a link to the teams page and the name of the school.
+    tuple
+        Returns a tuple containing a list of <a> html tags with a link to the teams page and the name of the school and a dictionary of school name mappings.
     """
     with open(r"NCAA Tournament/bracket_{}.html".format(year), 'r', encoding='utf-8') as f:
         page = f.read()
@@ -29,7 +30,14 @@ def get_ncaa_schools(year):
         for link in links:
             if 'schools' in link['href']:
                 ncaa_schools.add(link)
-    return ncaa_schools
+    for link in ncaa_schools:
+        school_name = link.get_text()
+        alt_name = link['href'].split('/')[3]
+        alt_name_split = alt_name.split('-')
+        name_parts = [s.lower() for s in alt_name_split]
+        alt_name = ' '.join(name_parts)
+        map_names.update({alt_name:school_name})
+    return (ncaa_schools, map_names)
 
 def scrape(url, delay=3.1):
     """Send an HTTP request to a web page with a time delay.
@@ -84,7 +92,7 @@ def scrape_basic_stats(url, stats_url, year):
     ----------
     url : string
         Main website url.
-    ncaa_url : string
+    stats_url : string
         Subdirectories of the url leading to the page contining the table of stats.
     year : int
         The tournament year.
@@ -98,6 +106,29 @@ def scrape_basic_stats(url, stats_url, year):
     with open(r"School Stats/Basic/basic_{}.html".format(year), 'w', encoding='utf-8') as f:
         f.write(page.text)
 
+def scrape_basic_opp_stats(url, stats_opp_url, year):
+    """Scrape basketball team opponent statistics from a table on a web page.
+
+    Pull a table of all Division 1 mens basketball program season basic team stats and save them as html files.
+
+    Parameters
+    ----------
+    url : string
+        Main website url.
+    stats_opp_url : string
+        Subdirectories of the url leading to the page contining the table of opponent stats.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    None
+        Writes to file.
+    """
+    page = scrape(url.format(stats_opp_url))
+    with open(r"School Stats/Basic/basic_opp_{}.html".format(year), 'w', encoding='utf-8') as f:
+        f.write(page.text)
+
 def scrape_advanced_stats(url, advanced_url, year):
     """Scrape basketball team statistics from a table on a web page.
 
@@ -107,7 +138,7 @@ def scrape_advanced_stats(url, advanced_url, year):
     ----------
     url : string
         Main website url.
-    ncaa_url : string
+    advanced_url : string
         Subdirectories of the url leading to the page contining the table of stats.
     year : int
         The tournament year.
@@ -119,6 +150,29 @@ def scrape_advanced_stats(url, advanced_url, year):
     """
     page = scrape(url.format(advanced_url))
     with open(r"School Stats/Advanced/advanced_{}.html".format(year), 'w', encoding='utf-8') as f:
+        f.write(page.text)
+
+def scrape_advanced_opp_stats(url, advanced_opp_url, year):
+    """Scrape basketball team statistics from a table on a web page.
+
+    Pull a table of all Division 1 mens basketball program season advanced team stats and save them as html files.
+
+    Parameters
+    ----------
+    url : string
+        Main website url.
+    advanced_opp_url : string
+        Subdirectories of the url leading to the page contining the table of opponent stats.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    None
+        Writes to file.
+    """
+    page = scrape(url.format(advanced_opp_url))
+    with open(r"School Stats/Advanced/advanced_opp_{}.html".format(year), 'w', encoding='utf-8') as f:
         f.write(page.text)
 
 def scrape_roster_stats(url, school, year):
@@ -211,17 +265,31 @@ def scrape_data(start_year, end_year):
     ncaa_url = r"/cbb/postseason/men/{}-ncaa.html"
     stats_url = r"/cbb/seasons/men/{}-school-stats.html"
     advanced_url = r"/cbb/seasons/men/{}-advanced-school-stats.html"
+    stats_opp_url = r"/cbb/seasons/men/{}-opponent-stats.html"
+    advanced_opp_url = r"/cbb/seasons/men/{}-advanced-opponent-stats.html"
+
+    # dictionary object to map alternate school names to common school names
+    map_names = {}
 
     for year in range(start_year, end_year+1):
         # ignore Covid year when there was no NCAA tournament
         if year != 2020:
+            # scrape per 100 possessions and opponent advanced stats starting from first availabel season in 2010
+            if year >= 2010:
+                scrape_basic_opp_stats(url, stats_opp_url.format(year), year)
+                scrape_advanced_opp_stats(url, advanced_opp_url.format(year), year)
             scrape_basic_stats(url, stats_url.format(year), year)
             scrape_advanced_stats(url, advanced_url.format(year), year)
             scrape_ncaas(url, ncaa_url.format(year), year)
-            ncaa_schools = get_ncaa_schools(year)
+            ncaa_schools, map_names = get_ncaa_schools(map_names, year)
             for school in ncaa_schools:
                 scrape_roster_stats(url, school, year)
                 scrape_schedule_results(url, school, year)
+
+    # write school name mapping dictionary to json file
+    json_object = json.dumps(map_names)
+    with open(r"alternate_school_names.json", 'w', encoding='utf-8') as f:
+        f.write(json_object)
 
 # NOTE: 1997 is the first year offensive and defensive rebounds are tracked, which is important for calculating advanced stats
 scrape_data(1997, 2024)
