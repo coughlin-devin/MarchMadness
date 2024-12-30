@@ -13,7 +13,7 @@ def nan_euclidean(y,X):
     return distances
 
 # TODO:
-# NOTE: manhatten distance may be better because it isn't affected by large single stat outliers in determining distance between KNN targets 
+# NOTE: manhatten distance may be better because it isn't affected by large single stat outliers in determining distance between KNN targets
 def nan_manhatten(y,X):
     pass
 
@@ -49,6 +49,7 @@ def knn_imputer(df, target, k, start_year, end_year, mode=False):
 
     return df
 
+# TODO: add random noise using residuals to mean imputation for better results
 def position_mean_imputer(df, column, start_year, end_year):
     """Fill in missing stat of players with the mean of their position group.
 
@@ -104,4 +105,17 @@ def position_mean_imputer(df, column, start_year, end_year):
                 df.loc[center_mask.index, column] = df.loc[center_mask.index, column].fillna(value=center)
                 df.loc[forward_mask.index, column] = df.loc[forward_mask.index, column].fillna(value=forward)
                 df.loc[guard_mask.index, column] = df.loc[guard_mask.index, column].fillna(value=guard)
+    return df
+
+# generate imputed values from gaussian distribution with global mean and standard deviation
+def gaussian_mean_imputation(df, columns):
+    # TODO: docstring
+    # df = df.drop('School', axis=1)
+    means = df.drop('School', axis=1).mean()
+    stds = df.drop('School', axis=1).std()
+    for column in columns:
+        num_missing = df[column].isna().sum()
+        gaussian = pd.Series(np.random.normal(means[column], stds[column], size=num_missing))
+        gaussian.index = df[column].loc[df[column].isna()].index
+        df.loc[:, column] = df.loc[:, column].fillna(value=gaussian)
     return df
