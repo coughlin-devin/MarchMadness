@@ -438,6 +438,60 @@ def build_advanced_stats(year):
     advanced_school_stats['Year'] = int(year)
     return advanced_school_stats
 
+def build_basic_opp_stats(year):
+    """Create a DataFrame containing basic team statistics.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain basic team opponents stats like shooting% and rebounding for all Division 1 teams.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of basic team opponents statistics.
+    """
+    with open(r"School Stats/Basic/basic_opp_{}.html".format(year), 'r', encoding='utf-8') as f:
+        page = f.read()
+    soup = BeautifulSoup(page, 'html.parser')
+    basic_opp_stats = soup.find('table', id='basic_opp_stats')
+    basic_opp_stats = pd.read_html(StringIO(str(basic_opp_stats)), flavor='bs4')[0]
+    basic_opp_stats['Year'] = int(year)
+    return basic_opp_stats
+
+def build_advanced_opp_stats(year):
+    """Create a DataFrame containing advanced team  opponents statistics.
+
+    Converts an HTML table object into a DataFrame. The DataFrame will contain advanced teams stats like shooting efficiency for all Division 1 teams.
+
+    Parameters
+    ----------
+    soup : bs4.BeautifulSoup
+        BeautifulSoup parsed HTML object.
+    school : string
+        The name of the school.
+    year : int
+        The tournament year.
+
+    Returns
+    -------
+    DataFrame
+        Returns a DataFrame of advanced team opponents statistics.
+    """
+    with open(r"School Stats/Advanced/advanced_opp_{}.html".format(year), 'r', encoding='utf-8') as f:
+        page = f.read()
+    soup = BeautifulSoup(page, 'html.parser')
+    advanced_opp_stats = soup.find('table', id='adv_opp_stats')
+    advanced_opp_stats = pd.read_html(StringIO(str(advanced_opp_stats)), flavor='bs4')[0]
+    advanced_opp_stats['Year'] = int(year)
+    return advanced_opp_stats
+
 def build_DataFrames(start_year, end_year):
     """Build DataFrames from HTML data.
 
@@ -460,6 +514,8 @@ def build_DataFrames(start_year, end_year):
     # lists to store tables
     basic_school_stats = []
     advanced_school_stats = []
+    basic_opp = []
+    advanced_opp = []
     rosters = []
     team_opp = []
     per_game = []
@@ -476,6 +532,11 @@ def build_DataFrames(start_year, end_year):
             advanced_stats = build_advanced_stats(year)
             basic_school_stats.append(basic_stats)
             advanced_school_stats.append(advanced_stats)
+            if year >= 2010:
+                basic_opp_stats = build_basic_opp_stats(year)
+                advanced_opp_stats = build_advanced_opp_stats(year)
+                basic_opp.append(basic_opp_stats)
+                advanced_opp.append(advanced_opp_stats)
 
             for file in os.listdir(r"Roster & Stats/{}".format(year)):
                 school, ext = os.path.splitext(file)
@@ -510,6 +571,8 @@ def build_DataFrames(start_year, end_year):
     # concatenate into DataFrames
     basic_stats_df = pd.concat(basic_school_stats).reset_index(drop=True)
     advanced_stats_df = pd.concat(advanced_school_stats).reset_index(drop=True)
+    basic_opp_df = pd.concat(basic_opp).reset_index(drop=True)
+    advanced_opp_df = pd.concat(advanced_opp).reset_index(drop=True)
     roster_df = pd.concat(rosters).reset_index(drop=True)
     team_opp_df = pd.concat(team_opp).reset_index(drop=True)
     player_df = pd.concat(per_game).reset_index(drop=True)
@@ -521,6 +584,8 @@ def build_DataFrames(start_year, end_year):
     # save to csv files
     basic_stats_df.to_csv(r"Data/Raw/basic_stats_table.csv", mode='w', index=False)
     advanced_stats_df.to_csv(r"Data/Raw/advanced_stats_table.csv", mode='w', index=False)
+    basic_opp_df.to_csv(r"Data/Raw/basic_opp_table.csv", mode='w', index=False)
+    advanced_opp_df.to_csv(r"Data/Raw/advanced_opp_table.csv", mode='w', index=False)
     roster_df.to_csv(r"Data/Raw/roster_table.csv", mode='w', index=False)
     team_opp_df.to_csv(r"Data/Raw/team_opp_table.csv", mode='w', index=False)
     player_df.to_csv(r"Data/Raw/player_table.csv", mode='w', index=False)
@@ -529,6 +594,6 @@ def build_DataFrames(start_year, end_year):
     schedule_df.to_csv(r"Data/Raw/schedule_table.csv", mode='w', index=False)
     ap_poll_df.to_csv(r"Data/Raw/ap_poll_table.csv", mode='w', index=False)
 
-    return (basic_stats_df, advanced_stats_df, roster_df, team_opp_df, player_df, per_40_df, per_100_df, schedule_df, ap_poll_df)
+    return (basic_stats_df, advanced_stats_df, basic_opp, advanced_opp, roster_df, team_opp_df, player_df, per_40_df, per_100_df, schedule_df, ap_poll_df)
 
-basic_stats_df, advanced_stats_df, roster_df, team_opp_df, player_df, per_40_df, per_100_df, schedule_df, ap_poll_df = build_DataFrames(1997, 2024)
+basic_stats_df, advanced_stats_df, basic_opp, advanced_opp, roster_df, team_opp_df, player_df, per_40_df, per_100_df, schedule_df, ap_poll_df = build_DataFrames(1997, 2024)
