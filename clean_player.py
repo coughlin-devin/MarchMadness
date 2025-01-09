@@ -23,8 +23,8 @@ def get_data(per_game=True):
     # create a column for the percentage of total team player minutes minutes a player plays (how many minutes does the player play over team games * 40min * 5players)
     df['MP%'] = df['G_P'] * df['MP_P'] / (df['MP_T'] * 5)
 
-    # drop unnecessary rank column
-    df.drop(['Rk'], axis=1, inplace=True)
+    # drop unnecessary columns
+    df.drop(['Rk', 'Player'], axis=1, inplace=True)
 
     return df
 
@@ -77,7 +77,7 @@ def drop_bench(df, percent_minutes=0.05):
         Returns a DataFrame without players who played fewer than some minimum percentage of their team's minutes.
     """
     bench = df.loc[df['MP%'] < percent_minutes]
-    df = df.drop(bench.index).reset_index()
+    df = df.drop(bench.index).reset_index(drop=True)
     return df
 
 def cohesion(minutes, playing_time=40, group=5):
