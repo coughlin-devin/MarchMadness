@@ -33,6 +33,9 @@ def prepare_frame(frame):
     ncaa_games = df.loc[df['Type'] == 'NCAA']
     df = df.drop(ncaa_games.index)
 
+    # remove unnecessary columns
+    df = df.drop(['Type', 'Opponent'], axis=1)
+
     # remove 13 (as of 2024) games with null wins/losses bc they were cancelled or postponed
     df.drop(df.loc[df['W'].isna()].index, inplace=True)
 
@@ -62,7 +65,7 @@ def venue(df):
         'H@':'A'
     }
     df.Venue = [map_venue[x] for x in venue]
-    df = pd.concat([df, pd.get_dummies(df.Venue)], axis=1)
+    df = pd.concat([df, pd.get_dummies(df.Venue, dtype='int64')], axis=1)
     df.drop(['Venue', 'Venue2'], axis=1, inplace=True)
     return df
 
@@ -104,7 +107,7 @@ def overtime(df):
     overtime = df.loc[~df['OT'].isna()]
     ot = [1 if x == 'OT' else int(x[0]) for x in overtime.OT]
     df.loc[~df['OT'].isna(), 'OT'] = ot
-    df.loc[df['OT'].isna(), 'OT'] = df.loc[df['OT'].isna(), 'OT'].fillna(value=0)
+    df.loc[df['OT'].isna(), 'OT'] = df.loc[df['OT'].isna(), 'OT'].astype('float64').fillna(value=0)
     return df
 
 def streaks(df):
@@ -142,10 +145,10 @@ def set_types(df):
         Returns input DataFrame with corrected dtypes.
     """
     # set numeric integer columns to int64 type
-    df.loc[:, ['Tm', 'Opp', 'OT', 'G', 'W', 'L', 'Streak', 'A', 'H', 'N']] = df.loc[:, ['Tm', 'Opp', 'OT', 'G', 'W', 'L', 'Streak', 'A', 'H', 'N']].astype('int64')
+    df = df.astype({'Tm':'int64', 'Opp':'int64', 'OT':'int64', 'G':'int64', 'W':'int64', 'L':'int64', 'Streak':'int64', 'A':'int64', 'H':'int64', 'N':'int64'})
 
     # set numeric float columns to float64 type
-    df.loc[:, 'SRS'] = df.loc[:, 'SRS'].astype('float64')
+    df = df.astype({'SRS':'float64'})
 
     return df
 
@@ -286,6 +289,9 @@ features = features_by_venue(df, features, 'A')
 features = features_by_venue(df, features, 'H')
 features = features_by_venue(df, features, 'N')
 features = features_not_home(df, features)
+
+# impute neutral site winning percentage with 0 for teams without neutral site games
+features['NW%'] = features['NW%'].fillna(0)
 
 # round features to 1 significant figure
 features.loc[:, ['SRS_OPP', 'PTS_Mean', 'OPP_Mean', 'A_PTS_Mean', 'A_OPP_Mean', 'A_MV_Mean', 'H_PTS_Mean', 'H_OPP_Mean', 'H_MV_Mean', 'N_PTS_Mean', 'N_OPP_Mean', 'N_MV_Mean', 'XH_PTS_Mean', 'XH_OPP_Mean', 'XH_MV_Mean']] = features.loc[:, ['SRS_OPP', 'PTS_Mean', 'OPP_Mean', 'A_PTS_Mean', 'A_OPP_Mean', 'A_MV_Mean', 'H_PTS_Mean', 'H_OPP_Mean', 'H_MV_Mean', 'N_PTS_Mean', 'N_OPP_Mean', 'N_MV_Mean', 'XH_PTS_Mean', 'XH_OPP_Mean', 'XH_MV_Mean']].round(1)
