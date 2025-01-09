@@ -1,6 +1,9 @@
 import pandas as pd
 from imputation import knn_imputer, position_mean_imputer
 
+# TODO: per_40
+# TODO: per_100
+
 def get_data(per_game=True):
     roster = pd.read_csv(r"Data/Clean/clean_roster.csv")
     team_opp = pd.read_csv(r"Data/Raw/team_opp_table.csv")
