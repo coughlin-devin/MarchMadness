@@ -4,6 +4,16 @@ from sklearn.preprocessing import MinMaxScaler
 
 # TODO: look into MissForest imputation, https://arxiv.org/html/2403.14687v1#S2, bookmarked some medium articles also
 
+# TODO: docstrings
+
+# NOTE: manhatten distance may be better because it isn't as affected by large single stat outliers in determining distance between KNN targets. In euclidean distance the difference between a large outlier is squared, while in manhatten it isn't, so a similar datapoint might be ruled out with euclidean distance and kept with manhatten distance
+# function to find manhatten distances between values in vector y and matrix X while ignoring NaN values
+def nan_manhatten(y,X):
+    difference = X.sub(y, axis=1)
+    absolute = difference.abs()
+    distances = absolute.sum(axis=1)
+    return distances
+
 # function to find euclidean distances between values in vector y and matrix X while ignoring NaN values
 def nan_euclidean(y,X):
     difference = X.sub(y, axis=1)
@@ -12,23 +22,20 @@ def nan_euclidean(y,X):
     distances = np.sqrt(sum)
     return distances
 
-# TODO:
-# NOTE: manhatten distance may be better because it isn't affected by large single stat outliers in determining distance between KNN targets
-def nan_manhatten(y,X):
-    pass
-
 # TODO: implement option for nan_manhatten
 # NOTE: only using players in the same year to impute on to keep 'era' intact and also because I'm treating each season as its own system
 def knn_imputer(df, target, k, start_year, end_year, mode=False):
     for year in range(start_year, end_year+1):
         if year != 2020:
-            X = df.loc[df['Year'] == year].drop(['School', 'Year', 'Player', 'RSCI Top 100'], axis=1)
+            # remove non-numeric columns
+            X = df.loc[df['Year'] == year].drop(['School', 'Year', 'RSCI Top 100'], axis=1)
 
             # scale data before using KNNImputer
             scaler = MinMaxScaler()
             scaled = scaler.fit_transform(X)
             scaled = pd.DataFrame(scaled, columns=X.columns, index=X.index)
 
+            # seperate target column
             Y = scaled.loc[scaled[target].isna()].drop(target, axis=1)
             num_players = len(Y)
             if num_players == 0:
@@ -36,7 +43,7 @@ def knn_imputer(df, target, k, start_year, end_year, mode=False):
             X = scaled.loc[~scaled[target].isna()].drop(target, axis=1)
 
             distances = Y.apply(nan_euclidean, axis=1, args=[X])
-            kth = np.argpartition(distances, kth=k, axis=-1).iloc[:,:k]
+            kth = pd.DataFrame(np.argpartition(distances, kth=k, axis=-1)).iloc[:,:k]
             indices = np.array([distances.iloc[i].iloc[kth.iloc[i]].index for i in range(num_players)])
 
             if mode:
@@ -71,7 +78,7 @@ def position_mean_imputer(df, column, start_year, end_year):
     DataFrame
         DataFrame with NaN values filled.
     """
-    group = df.groupby(['Year', 'Pos']).mean().reset_index()
+    group = df.drop('School', axis=1).groupby(['Year', 'Pos']).mean().reset_index()
     for year in range(start_year, end_year+1):
         # years missing all weights
         if year in [1997, 1998, 1999, 2000, 2001] and column=='Weight':
