@@ -31,12 +31,10 @@ def get_ncaa_schools(map_names, year):
             if 'schools' in link['href']:
                 ncaa_schools.add(link)
     for link in ncaa_schools:
-        school_name = link.get_text()
+        bracket_name = link.get_text()
         alt_name = link['href'].split('/')[3]
-        alt_name_split = alt_name.split('-')
-        name_parts = [s.lower() for s in alt_name_split]
-        alt_name = ' '.join(name_parts)
-        map_names.update({alt_name:school_name})
+        alt_name = alt_name.replace('-', ' ')
+        map_names.update({alt_name:bracket_name})
     return (ncaa_schools, map_names)
 
 def scrape(url, delay=3.1):
