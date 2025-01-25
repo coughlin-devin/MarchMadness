@@ -3,6 +3,7 @@ from imputation import knn_imputer, position_mean_imputer
 
 # TODO: per_40
 # TODO: per_100
+# TODO: check that features using mean are using the 'correct' mean
 
 def get_data(per_game=True):
     roster = pd.read_csv(r"Data/Clean/clean_roster.csv")
@@ -370,6 +371,9 @@ def clean_player_features(per_game=True, min_minutes=0):
     percentages.append('Cohesion')
     features.loc[:, percentages] = features.loc[:, percentages].round(3)
     features.loc[:, ~features.columns.isin(percentages)] = features.loc[:, ~features.columns.isin(percentages)].round(1)
+
+    # BUG remove Guard_Pos_Mean, Forward_Pos_Mean, and Center_Pos_Mean columns
+    features = features.drop(['Guard_Pos_Mean', 'Forward_Pos_Mean', 'Center_Pos_Mean'], axis=1)
 
     return features
 
