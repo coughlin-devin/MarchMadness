@@ -1,5 +1,7 @@
 import pandas as pd
 
+# TODO: last N games winning % and or streak
+
 # import data
 schedule = pd.read_csv(r"Data/Raw/schedule_table.csv", low_memory=False)
 
@@ -182,7 +184,7 @@ def create_features(df):
     features['SRS_OPP'] = means.SRS
     features['PTS_Mean'] = means.Tm
     features['OPP_Mean'] = means.Opp
-    features['MV_Median'] = means.Tm - means.Opp
+    features['MV_Mean'] = means.Tm - means.Opp
     features['MV_Median'] = meds.Tm - meds.Opp
     features['G'] = maxes.G
     features['W'] = maxes.W
