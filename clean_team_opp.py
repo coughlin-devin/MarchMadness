@@ -2,7 +2,6 @@ import pandas as pd
 from imputation import gaussian_mean_imputation
 
 team_opp_df = pd.read_csv(r"Data/Raw/team_opp_table.csv")
-team_opp_df.isna().sum()[50:]
 
 # BUG: GR (rank of how many games the team payed) and GR_OP (same but averaged for opposing teams) were mistakenly created while building the DataFrame. Just remove these since they are useless.
 df = team_opp_df.drop(['GR', 'GR_OP'], axis=1)
@@ -40,8 +39,6 @@ df.loc[:, ~df.columns.isin(percentages)] = df.loc[:, ~df.columns.isin(percentage
 # set columns to appropriate data types
 df = df.astype({'G': 'int64', 'G_OPP': 'int64'})
 
-df
-
 # TODO: look at historical correct brackets and check for patterns in them, are they symetric acros each region?
 
 # NOTE on RSCI (Risky) top 100 rankings: https://sites.google.com/site/rscihoops/home Link to experts: https://sites.google.com/site/rscihoops/home/the-experts
@@ -62,7 +59,7 @@ df
 #     Also, a player that just narrowly misses making 1 or more top 100 lists receives no points from those lists and is not effectively distinguished from all the others that were not ranked.
 #     For example, a guy ranked #101 gets the same zero points as a guy ranked #250 even though they clearly aren’t that close. Stated simply: “a miss is as good as a mile.”
 
-def possessions(FGA, FG, ORB, DRB, TOV, FTA, FGA_OP, FG_OP, ORB_OP, DRB_OP, TOV_OP, FTA_OP, weight_ft=0.475, weight_reb=1.07):
+def possessions(df, weight_ft=0.475, weight_reb=1.07, opponent=False):
     """
     Estimate the number of offensive possesions for a team.
     FGA - Field Goal Attempts
@@ -76,19 +73,52 @@ def possessions(FGA, FG, ORB, DRB, TOV, FTA, FGA_OP, FG_OP, ORB_OP, DRB_OP, TOV_
             This is calculated from college game data but may not be accurate/optimal.
     weight_reb - Weight placed on percentage of missed field goals that result in offensive rebounds.
     """
-
+    if not opponent:
     # basic formula for estimating number of possessions for a single team
-    simple = FGA - ORB + TOV + (0.475*FTA)
+        simple = df.FGA - df.ORB + df.TOV + (0.475*df.FTA)
 
-    # parts of surgical calclation
-    team_half = FGA + weight_ft*FTA - weight_reb*(ORB / (ORB + DRB_OP)) * (FGA-FG) + TOV
-    opp_half = FGA_OP + weight_ft*FTA_OP - weight_reb*(ORB_OP / (ORB_OP + DRB)) * (FGA_OP-FG_OP) + TOV_OP
+        # parts of surgical calclation
+        team_half = df.FGA + weight_ft*df.FTA - weight_reb*(df.ORB / (df.ORB + df.DRB_OPP)) * (df.FGA-df.FG) + df.TOV
+        opp_half = df.FGA_OPP + weight_ft*df.FTA_OPP - weight_reb*(df.ORB_OPP / (df.ORB_OPP + df.DRB)) * (df.FGA_OPP-df.FG_OPP) + df.TOV_OPP
 
-    # theoretically more precise formula for estimating number of possesions from basketball-reference.com
-    surgical = 0.5 * (team_half + opp_half)
+        # theoretically more precise formula for estimating number of possesions from basketball-reference.com
+        surgical = 0.5 * (team_half + opp_half)
+    else:
+        simple = df.FGA_OPP - df.ORB_OPP + df.TOV_OPP + (0.475*df.FTA_OPP)
+
+    # TODO: round possessions
+    simple = round(simple, 0)
+    surgical = round(surgical, 0)
 
     return (simple, surgical)
 
-# TODO: create advanced features and per possesions
+# calculate number of possesions per game
+simple_pos, surgical_pos = possessions(df)
 
-# TODO: clean per possession stats for 2010-2024 so i dont have to calculate those
+df['Simple_POS'] = simple_pos
+df['Surgical_POS'] = surgical_pos
+
+def per_possession_stats(df, surgical=False, opponent=False):
+    if surgical:
+        pos = 'Simple_POS'
+    else:
+        pos = 'Surgical_POS'
+
+    stats = ['FG', 'FGA', '2P', '2PA', '3P', '3PA', 'FT', 'FTA', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF', 'PTS']
+    if opponent:
+        stats = [x + '_OPP' for x in stats]
+    for stat in stats:
+        df[stat + '_per_' + pos] = round(df[stat] / df[pos], 3)
+    return df
+
+df = per_possession_stats(df)
+df = per_possession_stats(df, opponent=True)
+
+# drop games here because more accurate games in schedule table
+df = df.drop(['G', 'G_OPP'], axis=1)
+
+# replace tournament rounds with tournament wins
+df['WINS'] = df['Rounds'] - 1
+df = df.drop('Rounds', axis=1)
+
+df.to_csv(r"Data/Clean/clean_team_opp.csv", mode='w', index=False)
