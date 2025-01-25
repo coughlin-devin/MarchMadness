@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from io import StringIO
 import re
 import os
+import json
 
 # TODO: build per 100 possession data and only create it for teams without (available since 2010?)
 
@@ -49,6 +50,15 @@ def get_seed(soup):
     seed = re.search("[0-9]+", seed).group(0)
     return seed
 
+def format_school_name(school):
+    # replace - with space
+    school = school.replace('-', ' ')
+    # strip non-alpha-numeric characters
+    school = re.sub('[^a-zA-Z ]', '', school)
+    # make it lowercase
+    school = school.lower()
+    return school
+
 # NOTE: check NCAA opponent in first NCAA game to check if it was a play-in game
 def get_rounds(soup, year):
     """Get number of rounds played in NCAA and conference tournament.
@@ -72,15 +82,21 @@ def get_rounds(soup, year):
 
     # NCAA tournament rounds
     ncaa_games = schedule.loc[(schedule['Type'] == 'NCAA')]
-    if '{}.html'.format(ncaa_games.iloc[0].Opponent) in os.listdir(r"Roster & Stats/{}".format(year)):
+    # fillna(0) the regular and ctourn games bc since 2022 mant teams have an unplayed game that breaks the counting rounds logic
+    pre_wins = schedule.loc[(schedule['Type'] == 'REG') | (schedule['Type'] == 'CTOURN'), 'W'].fillna(0).astype('int64').max()
+    # remove ranking from opponenet name
+    with open(f"alternate_school_names.json", 'r', encoding='utf-8') as f:
+        school_mapping = json.load(f)
+    opponent = format_school_name(ncaa_games.iloc[0].Opponent)
+    opponent = school_mapping.get(opponent)
+    if ('{}.html'.format(re.sub('[^a-zA-Z \']', '', ncaa_games.iloc[0].Opponent)) in os.listdir(r"Roster & Stats/{}".format(year))) or ('{}.html'.format(opponent) in os.listdir(r"Roster & Stats/{}".format(year))):
         # wins and losses are in the 8th column which doesn't have good name
-        ncaa_wins = ncaa_games.loc[(schedule.iloc[:,8] == 'W')]
         play_in_rounds = 0
     else:
         ncaa_games = ncaa_games.iloc[1:]
-        ncaa_wins = ncaa_games.loc[(schedule.iloc[:,8] == 'W')]
         play_in_rounds = 1
-    ncaa_rounds = len(ncaa_wins) + 1
+    ncaa_wins = ncaa_games.loc[:, 'W'].astype('int64').max() - pre_wins
+    ncaa_rounds = ncaa_wins + 1
 
     # conference tournament rounds
     conf_games = schedule.loc[schedule['Type'] == 'CTOURN']
@@ -141,6 +157,7 @@ def is_conference_champion(soup):
                 tourney = 1
     return (reg_season, tourney)
 
+# TODO: get SOS
 # NOTE: find html tag by attribute using dictionary {attr : name}
 def get_srs(soup):
     """Get the Simple Rating System (SRS) rating of a school.
@@ -238,7 +255,17 @@ def build_per_game_team_opp(soup, school, year):
     with open(r"Schedule & Results/{}/{}.html".format(year, school), 'r', encoding='utf-8') as f:
         page = f.read()
     stew = BeautifulSoup(page, 'html.parser')
-    ncaa_rounds, play_in_rounds, conf_rounds = get_rounds(stew, year)
+    # BUG: these teams are missing info on their ncaa game or their opponent is a school with multiple names that aren't caught
+    if (school == 'VCU') and (year == 2021):
+        ncaa_rounds = 1
+        play_in_rounds = 0
+        conf_rounds = 3
+    elif (school == 'Oregon') and (year == 2021):
+        ncaa_rounds = 3
+        play_in_rounds = 0
+        conf_rounds = 2
+    else:
+        ncaa_rounds, play_in_rounds, conf_rounds = get_rounds(stew, year)
     per_game_team_opp['Rounds'] = ncaa_rounds
     per_game_team_opp['PIR'] = play_in_rounds
     per_game_team_opp['CTR'] = conf_rounds
@@ -308,7 +335,6 @@ def build_per_40(soup, school, year):
     else:
         return None
 
-# TODO:
 def build_per_100(soup, school, year):
     """Create a DataFrame containing player per 100 possessions statistics.
 
