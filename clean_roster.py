@@ -73,10 +73,10 @@ def ordinal_encoding(df):
     """
     # encode class
     class_map = {
-        'FR':1,
-        'SO':2,
-        'JR':3,
-        'SR':4
+        'FR':0,
+        'SO':1,
+        'JR':2,
+        'SR':3
     }
     ordinal_class = pd.Series([class_map[i] if i in class_map else float('nan') for i in df.Class], index=df.index, dtype='float64')
     df.Class = ordinal_class
@@ -96,7 +96,9 @@ def ordinal_encoding(df):
     top100 = top100.astype('int64')
     top100 = 101 - top100
     df.loc[top100.index, 'RSCI Top 100'] = top100
-    df['RSCI Top 100'].fillna(value=0, inplace=True)
+    df = df.astype({'RSCI Top 100':'float32'})
+    df.loc[:, 'RSCI Top 100'] = df.loc[:, 'RSCI Top 100'].fillna(value=0)
+    df = df.astype({'RSCI Top 100':'int64'})
 
     return df
 
