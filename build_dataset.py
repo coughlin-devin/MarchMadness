@@ -82,7 +82,7 @@ def get_rounds(soup, year):
 
     # NCAA tournament rounds
     ncaa_games = schedule.loc[(schedule['Type'] == 'NCAA')]
-    # fillna(0) the regular and ctourn games bc since 2022 mant teams have an unplayed game that breaks the counting rounds logic
+    # fillna(0) the regular and ctourn games bc since 2022 many teams have an unplayed game that breaks the counting rounds logic
     pre_wins = schedule.loc[(schedule['Type'] == 'REG') | (schedule['Type'] == 'CTOURN'), 'W'].fillna(0).astype('int64').max()
     # remove ranking from opponenet name
     with open(f"alternate_school_names.json", 'r', encoding='utf-8') as f:
@@ -95,7 +95,7 @@ def get_rounds(soup, year):
     else:
         ncaa_games = ncaa_games.iloc[1:]
         play_in_rounds = 1
-    ncaa_wins = ncaa_games.loc[:, 'W'].astype('int64').max() - pre_wins
+    ncaa_wins = ncaa_games.loc[:, 'W'].astype('int64').max() - pre_wins - play_in_rounds
     ncaa_rounds = ncaa_wins + 1
 
     # conference tournament rounds
