@@ -228,6 +228,7 @@ def scrape_schedule_results(url, school, year):
     with open(r"Schedule & Results/{}/{}.html".format(year, school_name), 'w', encoding='utf-8') as f:
         f.write(page.text)
 
+# WARNING: need NCAA bracket to be filled out with all first four games already played to work, otherwise there will be an erroneous tbd on the bracket which will break the scripts and the first four teams will be missing
 def scrape_data(start_year, end_year):
     """Scrape all the data for each year from https://www.sports-reference.com.
 
@@ -271,23 +272,19 @@ def scrape_data(start_year, end_year):
 
     for year in range(start_year, end_year+1):
         # ignore Covid year when there was no NCAA tournament
-        if year != 2020:
-            # scrape per 100 possessions and opponent advanced stats starting from first availabel season in 2010
-            if year >= 2010:
-                scrape_basic_opp_stats(url, stats_opp_url.format(year), year)
-                scrape_advanced_opp_stats(url, advanced_opp_url.format(year), year)
-            scrape_basic_stats(url, stats_url.format(year), year)
-            scrape_advanced_stats(url, advanced_url.format(year), year)
-            scrape_ncaas(url, ncaa_url.format(year), year)
-            ncaa_schools, map_names = get_ncaa_schools(map_names, year)
-            for school in ncaa_schools:
-                scrape_roster_stats(url, school, year)
-                scrape_schedule_results(url, school, year)
-
-    # write school name mapping dictionary to json file
-    json_object = json.dumps(map_names)
-    with open(r"alternate_school_names.json", 'w', encoding='utf-8') as f:
-        f.write(json_object)
+        if year == 2020:
+            continue
+        # scrape per 100 possessions and opponent advanced stats starting from first availabel season in 2010
+        if year >= 2010:
+            scrape_basic_opp_stats(url, stats_opp_url.format(year), year)
+            scrape_advanced_opp_stats(url, advanced_opp_url.format(year), year)
+        scrape_basic_stats(url, stats_url.format(year), year)
+        scrape_advanced_stats(url, advanced_url.format(year), year)
+        scrape_ncaas(url, ncaa_url.format(year), year)
+        ncaa_schools, map_names = get_ncaa_schools(map_names, year)
+        for school in ncaa_schools:
+            scrape_roster_stats(url, school, year)
+            scrape_schedule_results(url, school, year)
 
 # NOTE: 1997 is the first year offensive and defensive rebounds are tracked, which is important for calculating advanced stats
-scrape_data(1997, 2024)
+scrape_data(2025, 2025)
